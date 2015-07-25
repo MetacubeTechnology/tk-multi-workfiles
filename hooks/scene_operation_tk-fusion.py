@@ -69,10 +69,16 @@ class SceneOperation(Hook):
             # save the current scene:
             the_comp = f_connection.GetCurrentComp ()
             file_path = the_comp.GetAttrs ('COMPS_FileName')
+
+            self.update_fusion_saver_nodes (the_comp, file_path)
+
             the_comp.Save (file_path)
         elif operation == "save_as":
             # save the scene as file_path:
             the_comp = f_connection.GetCurrentComp ()
+            
+            self.update_fusion_saver_nodes (the_comp, file_path)
+
             the_comp.Save (file_path)
         elif operation == "reset":
             """
@@ -82,3 +88,31 @@ class SceneOperation(Hook):
             the_comp.Close ()
             f_connection.NewComp ()
             return True
+
+    def update_fusion_saver_nodes (self, the_comp, file_path):
+        try:
+            only_selected_nodes = False
+            list_of_tools = the_comp.GetToolList (only_selected_nodes, "Saver")
+            self.parent.log_debug ("List of tools values are: %s" % list_of_tools)
+            for index, tool in list_of_tools.iteritems ():
+                is_saver_node = tool.GetData ("Shotgun_Saver_Node")
+                if is_saver_node:
+                    self.parent.log_debug ("Saver node was FOUND!: %s" % tool)
+                    work_template_name = tool.GetData ("Work_Template")
+
+                    self.parent.log_info("Detected Node work template: %s" % str(work_template_name))
+
+                    self.parent.log_info(str(self.parent.sgtk.templates))
+
+                    work_template_obj = self.parent.sgtk.templates[work_template_name]
+                    fields = work_template_obj.get_fields (file_path)
+                    render_template_name = tool.GetData ("Render_Template")
+
+                    self.parent.log_info("Detected Node render template: %s" % str(render_template_name))
+
+                    render_template_obj = self.parent.sgtk.templates[render_template_name]
+                    new_render_path = render_template_obj.apply_fields (fields).replace ("%04d", "")
+                    tool.Clip = new_render_path
+        except:
+            import traceback
+            self.parent.log_error(traceback.format_exc())
